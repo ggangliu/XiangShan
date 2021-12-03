@@ -199,6 +199,11 @@ class SSIT(implicit p: Parameters) extends XSModule {
           ssid = ssidAllocate,
           strict = false.B
         )
+        printf("%d: SSIT update case00: load pc %x store pc %x ssid %x\n", GTimer(), 
+          memPredUpdateReqReg.ldpc, 
+          memPredUpdateReqReg.stpc,
+          ssidAllocate
+        )
       }
       // 2. "If the load has been assigned a store set, but the store has not,
       // the store is assigned the load’s store set."
@@ -209,6 +214,10 @@ class SSIT(implicit p: Parameters) extends XSModule {
           ssid = loadOldSSID,
           strict = false.B
         )
+        printf("%d: SSIT update: load pc %x valid %b ssid %x store pc %x valid %b ssid %x\n", GTimer(), 
+          memPredUpdateReqReg.ldpc, loadAssigned, loadOldSSID, 
+          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID
+        )
       }
       // 3. "If the store has been assigned a store set, but the load has not,
       // the load is assigned the store’s store set."
@@ -218,6 +227,10 @@ class SSIT(implicit p: Parameters) extends XSModule {
           valid = true.B,
           ssid = storeOldSSID,
           strict = false.B
+        )
+        printf("%d: SSIT update: load pc %x valid %b ssid %x store pc %x valid %b ssid %x\n", GTimer(), 
+          memPredUpdateReqReg.ldpc, loadAssigned, loadOldSSID, 
+          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID
         )
       }
       // 4. "If both the load and the store have already been assigned store sets,
@@ -240,6 +253,10 @@ class SSIT(implicit p: Parameters) extends XSModule {
           data_sram.io.wdata(SSIT_UPDATE_LOAD_READ_PORT).strict := true.B
           debug_strict(memPredUpdateReqReg.ldpc) := false.B
         }
+        printf("%d: SSIT update: load pc %x valid %b ssid %x store pc %x valid %b ssid %x\n", GTimer(), 
+          memPredUpdateReqReg.ldpc, loadAssigned, loadOldSSID, 
+          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID
+        )
       }
     }
   }
@@ -277,14 +294,6 @@ class SSIT(implicit p: Parameters) extends XSModule {
         debug_valid(resetStepCounter) := false.B
         resetStepCounter := resetStepCounter + 1.U
       }
-    }
-  }
-
-  // debug
-  for (i <- 0 until StorePipelineWidth) {
-    when (memPredUpdateReqReg.valid) {
-      XSDebug("%d: SSIT update: load pc %x store pc %x\n", GTimer(), memPredUpdateReqReg.ldpc, memPredUpdateReqReg.stpc)
-      XSDebug("%d: SSIT update: load valid %b ssid %x  store valid %b ssid %x\n", GTimer(), loadAssigned, loadOldSSID, storeAssigned, storeOldSSID)
     }
   }
 }
@@ -360,6 +369,9 @@ class LFST(implicit p: Parameters) extends XSModule {
         }
       )
     }
+    when(io.dispatch.resp(i).bits.shouldWait){
+      printf("%d: LFST load wait ssid %x valid_lfst %b valid_dispatch %b\n", GTimer(), io.dispatch.req(i).bits.ssid, validVec(io.dispatch.req(i).bits.ssid).asUInt, hitInDispatchBundleVec.asUInt)
+    }
   }
 
   // when store is issued, mark it as invalid
@@ -368,6 +380,9 @@ class LFST(implicit p: Parameters) extends XSModule {
     (0 until LFSTWidth).map(j => {
       when(io.storeIssue(i).valid && io.storeIssue(i).bits.uop.robIdx.value === robIdxVec(io.storeIssue(i).bits.uop.cf.ssid)(j).value){
         validVec(io.storeIssue(i).bits.uop.cf.ssid)(j) := false.B
+        when(valid(io.storeIssue(i).bits.uop.cf.ssid)){
+          printf("%d: LFST store issue ssid %x oldvalid %b\n", GTimer(), io.storeIssue(i).bits.uop.cf.ssid, validVec(io.storeIssue(i).bits.uop.cf.ssid).asUInt)
+        }
       }
     })
   })
@@ -380,6 +395,7 @@ class LFST(implicit p: Parameters) extends XSModule {
       allocPtr(waddr) := allocPtr(waddr) + 1.U
       validVec(waddr)(wptr) := true.B
       robIdxVec(waddr)(wptr) := io.dispatch.req(i).bits.robIdx
+      printf("%d: LFST store dispatch ssid %x oldvalid %b\n", GTimer(), waddr, validVec(waddr).asUInt)
     }
   })
 
@@ -403,5 +419,9 @@ class LFST(implicit p: Parameters) extends XSModule {
         }
       })
     })
+  }
+
+  when (RegNext(io.redirect.fire())) {
+    printf("%d: LFST redirect\n", GTimer())
   }
 }
