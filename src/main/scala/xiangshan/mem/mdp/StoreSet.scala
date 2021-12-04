@@ -214,9 +214,10 @@ class SSIT(implicit p: Parameters) extends XSModule {
           ssid = loadOldSSID,
           strict = false.B
         )
-        printf("%d: SSIT update: load pc %x valid %b ssid %x store pc %x valid %b ssid %x\n", GTimer(), 
+        printf("%d: SSIT update case10: load pc %x valid %b ssid %x store pc %x valid %b ssid %x new_ssid %x\n", GTimer(), 
           memPredUpdateReqReg.ldpc, loadAssigned, loadOldSSID, 
-          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID
+          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID,
+          loadOldSSID
         )
       }
       // 3. "If the store has been assigned a store set, but the load has not,
@@ -228,9 +229,10 @@ class SSIT(implicit p: Parameters) extends XSModule {
           ssid = storeOldSSID,
           strict = false.B
         )
-        printf("%d: SSIT update: load pc %x valid %b ssid %x store pc %x valid %b ssid %x\n", GTimer(), 
+        printf("%d: SSIT update case01: load pc %x valid %b ssid %x store pc %x valid %b ssid %x new_ssid %x\n", GTimer(), 
           memPredUpdateReqReg.ldpc, loadAssigned, loadOldSSID, 
-          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID
+          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID,
+          storeOldSSID
         )
       }
       // 4. "If both the load and the store have already been assigned store sets,
@@ -253,9 +255,10 @@ class SSIT(implicit p: Parameters) extends XSModule {
           data_sram.io.wdata(SSIT_UPDATE_LOAD_READ_PORT).strict := true.B
           debug_strict(memPredUpdateReqReg.ldpc) := false.B
         }
-        printf("%d: SSIT update: load pc %x valid %b ssid %x store pc %x valid %b ssid %x\n", GTimer(), 
+        printf("%d: SSIT update case11: load pc %x valid %b ssid %x store pc %x valid %b ssid %x new_ssid %x\n", GTimer(), 
           memPredUpdateReqReg.ldpc, loadAssigned, loadOldSSID, 
-          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID
+          memPredUpdateReqReg.stpc, storeAssigned, storeOldSSID,
+          winnerSSID
         )
       }
     }

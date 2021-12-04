@@ -118,7 +118,7 @@ class Dispatch(implicit p: Parameters) extends XSModule with HasExceptionNO {
       XSError(io.fromRename(i).valid && updatedCommitType(i) =/= CommitType.NORMAL, "why fused?\n")
     }
 
-    io.lfst.req(i).valid := io.fromRename(i).fire() && updatedUop(i).cf.storeSetHit
+    io.lfst.req(i).valid := io.toLsDq.req(i).valid && updatedUop(i).cf.storeSetHit
     io.lfst.req(i).bits.isstore := isStore(i)
     io.lfst.req(i).bits.ssid := updatedUop(i).cf.ssid
     io.lfst.req(i).bits.robIdx := updatedUop(i).robIdx // speculatively assigned in rename
@@ -134,70 +134,71 @@ class Dispatch(implicit p: Parameters) extends XSModule with HasExceptionNO {
     // update singleStep
     updatedUop(i).ctrl.singleStep := io.singleStep && (if (i == 0) singleStepStatus else true.B)
 
-    if (env.EnableDifftest) {
-      // debug runahead hint
-      val debug_runahead_checkpoint_id = Wire(checkpoint_id.cloneType)
-      if(i == 0){
-        debug_runahead_checkpoint_id := checkpoint_id
-      } else {
-        debug_runahead_checkpoint_id := checkpoint_id + PopCount((0 until i).map(i => 
-          io.fromRename(i).fire()
-        ))
-      }
+  // TODO: refactor needed
+  //   if (env.EnableDifftest) {
+  //     // debug runahead hint
+  //     val debug_runahead_checkpoint_id = Wire(checkpoint_id.cloneType)
+  //     if(i == 0){
+  //       debug_runahead_checkpoint_id := checkpoint_id
+  //     } else {
+  //       debug_runahead_checkpoint_id := checkpoint_id + PopCount((0 until i).map(i => 
+  //         io.fromRename(i).fire()
+  //       ))
+  //     }
 
-      val runahead = Module(new DifftestRunaheadEvent)
-      runahead.io.clock         := clock
-      runahead.io.coreid        := io.hartId
-      runahead.io.index         := i.U
-      runahead.io.valid         := io.fromRename(i).fire()
-      runahead.io.branch        := isBranch(i) // setup checkpoint for branch
-      runahead.io.may_replay    := isLs(i) && !isStore(i) // setup checkpoint for load, as load may replay
-      runahead.io.pc            := updatedUop(i).cf.pc
-      runahead.io.checkpoint_id := debug_runahead_checkpoint_id 
+  //     val runahead = Module(new DifftestRunaheadEvent)
+  //     runahead.io.clock         := clock
+  //     runahead.io.coreid        := io.hartId
+  //     runahead.io.index         := i.U
+  //     runahead.io.valid         := io.fromRename(i).fire()
+  //     runahead.io.branch        := isBranch(i) // setup checkpoint for branch
+  //     runahead.io.may_replay    := isLs(i) && !isStore(i) // setup checkpoint for load, as load may replay
+  //     runahead.io.pc            := updatedUop(i).cf.pc
+  //     runahead.io.checkpoint_id := debug_runahead_checkpoint_id 
 
-      // when(runahead.io.valid){
-      //   printf("XS runahead " + i + " : %d: pc %x branch %x cpid %x\n",
-      //     GTimer(),
-      //     runahead.io.pc,
-      //     runahead.io.branch,
-      //     runahead.io.checkpoint_id
-      //   );
-      // }
+  //     // when(runahead.io.valid){
+  //     //   printf("XS runahead " + i + " : %d: pc %x branch %x cpid %x\n",
+  //     //     GTimer(),
+  //     //     runahead.io.pc,
+  //     //     runahead.io.branch,
+  //     //     runahead.io.checkpoint_id
+  //     //   );
+  //     // }
 
-      val mempred_check = Module(new DifftestRunaheadMemdepPred)
-      mempred_check.io.clock     := clock
-      mempred_check.io.coreid    := io.hartId
-      mempred_check.io.index     := i.U
-      mempred_check.io.valid     := io.fromRename(i).fire() && isLs(i)
-      mempred_check.io.is_load   := !isStore(i) && isLs(i)
-      mempred_check.io.need_wait := updatedUop(i).cf.loadWaitBit
-      mempred_check.io.pc        := updatedUop(i).cf.pc 
+  //     val mempred_check = Module(new DifftestRunaheadMemdepPred)
+  //     mempred_check.io.clock     := clock
+  //     mempred_check.io.coreid    := io.hartId
+  //     mempred_check.io.index     := i.U
+  //     mempred_check.io.valid     := io.fromRename(i).fire() && isLs(i)
+  //     mempred_check.io.is_load   := !isStore(i) && isLs(i)
+  //     mempred_check.io.need_wait := updatedUop(i).cf.loadWaitBit
+  //     mempred_check.io.pc        := updatedUop(i).cf.pc 
 
-      when(RegNext(mempred_check.io.valid)){
-        XSDebug("mempred_check " + i + " : %d: pc %x ld %x need_wait %x oracle va %x\n",
-          RegNext(GTimer()),
-          RegNext(mempred_check.io.pc),
-          RegNext(mempred_check.io.is_load),
-          RegNext(mempred_check.io.need_wait),
-          mempred_check.io.oracle_vaddr 
-        );
-      }
-      updatedUop(i).debugInfo.runahead_checkpoint_id := debug_runahead_checkpoint_id
-    }
+  //     when(RegNext(mempred_check.io.valid)){
+  //       XSDebug("mempred_check " + i + " : %d: pc %x ld %x need_wait %x oracle va %x\n",
+  //         RegNext(GTimer()),
+  //         RegNext(mempred_check.io.pc),
+  //         RegNext(mempred_check.io.is_load),
+  //         RegNext(mempred_check.io.need_wait),
+  //         mempred_check.io.oracle_vaddr 
+  //       );
+  //     }
+  //     updatedUop(i).debugInfo.runahead_checkpoint_id := debug_runahead_checkpoint_id
+  //   }
   }
 
   // store set perf count
-  XSPerfAccumulate("waittable_load_wait", PopCount((0 until RenameWidth).map(i =>
-    io.fromRename(i).fire() && io.fromRename(i).bits.cf.loadWaitBit && !isStore(i) && isLs(i)
-  )))
+  // XSPerfAccumulate("waittable_load_wait", PopCount((0 until RenameWidth).map(i =>
+  //   io.fromRename(i).fire() && io.fromRename(i).bits.cf.loadWaitBit && !isStore(i) && isLs(i)
+  // )))
   XSPerfAccumulate("storeset_load_wait", PopCount((0 until RenameWidth).map(i =>
-    io.fromRename(i).fire() && updatedUop(i).cf.loadWaitBit && !isStore(i) && isLs(i)
+    io.toLsDq.req(i).valid && updatedUop(i).cf.loadWaitBit && !isStore(i) && isLs(i)
   )))
   XSPerfAccumulate("storeset_load_strict_wait", PopCount((0 until RenameWidth).map(i =>
-    io.fromRename(i).fire() && updatedUop(i).cf.loadWaitBit && updatedUop(i).cf.loadWaitStrict && !isStore(i) && isLs(i)
+    io.toLsDq.req(i).valid && updatedUop(i).cf.loadWaitBit && updatedUop(i).cf.loadWaitStrict && !isStore(i) && isLs(i)
   )))
   XSPerfAccumulate("storeset_store_wait", PopCount((0 until RenameWidth).map(i =>
-    io.fromRename(i).fire() && updatedUop(i).cf.loadWaitBit && isStore(i)
+    io.toLsDq.req(i).valid && updatedUop(i).cf.loadWaitBit && isStore(i)
   )))
 
   /**
