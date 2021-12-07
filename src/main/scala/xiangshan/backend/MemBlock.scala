@@ -189,10 +189,7 @@ class MemBlockImp(outer: MemBlock) extends LazyModuleImp(outer)
 
   val pmp_check = VecInit(Seq.fill(exuParameters.LduCnt + exuParameters.StuCnt)(Module(new PMPChecker(3)).io))
   for ((p,d) <- pmp_check zip dtlb.map(_.pmp(0))) {
-    p.env.pmp := pmp.io.pmp
-    p.env.pma := pmp.io.pma
-    p.env.mode := tlbcsr.priv.dmode
-    p.req := d
+    p.apply(tlbcsr.priv.dmode, pmp.io.pmp, pmp.io.pma, d)
     require(p.req.bits.size.getWidth == d.bits.size.getWidth)
   }
   val tdata = Reg(Vec(6, new MatchTriggerIO))
@@ -459,7 +456,10 @@ class MemBlockImp(outer: MemBlock) extends LazyModuleImp(outer)
   }
 
   lsq.io.exceptionAddr.isStore := io.lsqio.exceptionAddr.isStore
-  io.lsqio.exceptionAddr.vaddr := Mux(atomicsUnit.io.exceptionAddr.valid, atomicsUnit.io.exceptionAddr.bits, lsq.io.exceptionAddr.vaddr)
+  // Address is delayed by one cycle, so does the atomics address
+  val atomicsException = RegNext(atomicsUnit.io.exceptionAddr.valid)
+  val atomicsExceptionAddress = RegNext(atomicsUnit.io.exceptionAddr.bits)
+  io.lsqio.exceptionAddr.vaddr := Mux(atomicsException, atomicsExceptionAddress, lsq.io.exceptionAddr.vaddr)
 
   io.memInfo.sqFull := RegNext(lsq.io.sqFull)
   io.memInfo.lqFull := RegNext(lsq.io.lqFull)
